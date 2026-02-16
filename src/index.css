@@ -1,0 +1,76 @@
+body {
+  font-family: system-ui, Arial;
+  background: #111;
+  color: #eee;
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+.app {
+  width: 420px;
+}
+.topbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.tile-preview {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.preview {
+  width: 36px;
+  height: 36px;
+  background: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 18px;
+}
+.preview.small {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+.board {
+  display: grid;
+  gap: 6px;
+  background: #0f0f0f;
+  padding: 6px;
+  border-radius: 8px;
+}
+.board-cell {
+  width: 48px;
+  height: 48px;
+}
+.cell {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #111;
+  color: #fff;
+  font-weight: 700;
+}
+.cell.filled {
+  background: linear-gradient(180deg, #375, #1a4);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25);
+}
+.help {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #ccc;
+}
+button {
+  background: #2a6;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
