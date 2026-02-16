@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   createBoard, makeTileBag, drawTile, placeTile,
-  findAllWords, removeMarked
+  findAllWords, removeMarkedWithWords
 } from "./GameEngine";
 import { loadWordSet } from "./Dictionary";
 import "./index.css";
@@ -9,21 +9,20 @@ import "./index.css";
 const ROWS = 8, COLS = 5;
 const MIN_WORD_LEN = 4; // change here if you want 3+
 
-function Cell({ val }) {
-  return <div className={"cell " + (val ? "filled" : "")}>{val || ""}</div>;
+function Cell({ val, animState }) {
+  return <div className={"cell " + (val ? "filled " : "") + (animState || "")}>{val || ""}</div>;
 }
 
 export default function App() {
   const [board, setBoard] = useState(() => createBoard(ROWS, COLS));
   const [bag, setBag] = useState(() => makeTileBag());
-  const [current, setCurrent] = useState(() => {
-    const b = makeTileBag();
-    return drawTile(b);
-  });
+  const [current, setCurrent] = useState(null);
   const [next, setNext] = useState(null);
   const [score, setScore] = useState(0);
+  const [foundWords, setFoundWords] = useState([]);
   const [gameOver, setGameOver] = useState(false);
   const [message, setMessage] = useState("");
+  const [animStates, setAnimStates] = useState(() => createBoard(ROWS, COLS));
 
   const [wordSet, setWordSet] = useState(null);
   const [loadingDict, setLoadingDict] = useState(true);
@@ -50,6 +49,7 @@ export default function App() {
         setWordSet(set);
         setDictError(null);
         console.log("Loaded dictionary size:", set.size);
+        console.log("RAMS in dict?", set.has("RAMS"));
       } catch (err) {
         console.error("Dictionary load failed:", err);
         if (!mounted) return;
@@ -96,18 +96,46 @@ export default function App() {
     let newBoard = res.board;
 
     // find words using the loaded dictionary
+    console.log("Board state:", newBoard);
     const found = findAllWords(newBoard, wordSet, MIN_WORD_LEN);
+    console.log("Found words:", found.words.map(w => w.text));
 
     if (found.markedPositions && found.markedPositions.size > 0) {
-      const { board: after, score: delta } = removeMarked(newBoard, found.markedPositions);
-      setScore(s => s + delta);
-      newBoard = after;
-      setMessage(`Cleared ${found.markedPositions.size} letters from ${found.words.length} words`);
+      // Mark cells for removal animation
+      const removeAnims = createBoard(ROWS, COLS);
+      found.markedPositions.forEach(pos => {
+        const [r, c] = pos.split(':').map(Number);
+        removeAnims[r][c] = 'removing';
+      });
+      setAnimStates(removeAnims);
+
+      // Wait for fade-out animation, then remove and apply gravity
+      setTimeout(() => {
+        const { board: after, score: delta } = removeMarkedWithWords(newBoard, found.words);
+        
+        // Mark cells that moved for falling animation
+        const fallAnims = createBoard(ROWS, COLS);
+        for (let c = 0; c < COLS; c++) {
+          for (let r = ROWS - 1; r >= 0; r--) {
+            if (after[r][c] && newBoard[r][c] !== after[r][c]) {
+              fallAnims[r][c] = 'falling';
+            }
+          }
+        }
+        
+        setBoard(after);
+        setAnimStates(fallAnims);
+        setScore(s => s + delta);
+        setFoundWords(prev => [...found.words.map(w => w.text), ...prev].slice(0, 100));
+        setMessage(`Cleared ${found.markedPositions.size} letters from ${found.words.length} words`);
+        
+        // Clear animations after they complete
+        setTimeout(() => setAnimStates(createBoard(ROWS, COLS)), 300);
+      }, 300);
     } else {
+      setBoard(newBoard);
       setMessage("");
     }
-
-    setBoard(newBoard);
 
     // draw next tile
     const newBag = [...bag];
@@ -117,6 +145,7 @@ export default function App() {
 
   function handleReset() {
     setBoard(createBoard(ROWS, COLS));
+    setAnimStates(createBoard(ROWS, COLS));
     const b = makeTileBag();
     const c = drawTile(b);
     const n = drawTile(b);
@@ -124,12 +153,14 @@ export default function App() {
     setCurrent(c);
     setNext(n);
     setScore(0);
+    setFoundWords([]);
     setGameOver(false);
     setMessage("");
   }
 
   return (
     <div className="app">
+      <div className="game-area">
       <h1>WordDrop</h1>
 
       <div className="topbar">
@@ -146,7 +177,7 @@ export default function App() {
         {board.map((row, rIdx) =>
           row.map((cell, cIdx) => (
             <div key={`${rIdx}:${cIdx}`} className="board-cell" onClick={() => handleColumnClick(cIdx)}>
-              <Cell val={cell} />
+              <Cell val={cell} animState={animStates[rIdx][cIdx]} />
             </div>
           ))
         )}
@@ -158,6 +189,14 @@ export default function App() {
         <p style={{fontSize:12, color:"#aaa"}}>
           Dictionary: {loadingDict ? "loading…" : (wordSet ? `${wordSet.size} words loaded` : "none")}
         </p>
+      </div>
+      </div>
+
+      <div className="words-list">
+        <h3>Words Found ({foundWords.length})</h3>
+        <ul>
+          {foundWords.map((word, idx) => <li key={idx}>{word}</li>)}
+        </ul>
       </div>
     </div>
   );

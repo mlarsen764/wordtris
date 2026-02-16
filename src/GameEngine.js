@@ -7,11 +7,6 @@ const DEFAULT_ROWS = 8;
 const DEFAULT_COLS = 5;
 const MIN_WORD_LEN = 4;
 
-// Simple test dictionary - replace this with a larger set later.
-const SAMPLE_DICT = new Set([
-  "WORD","TEST","READ","NOTE","PLAY","DROP","GRID","FALL","FIRE","TIME","LINE","TILE","GAME","SAND"
-]);
-
 // Simple letter scores (Scrabble-like small subset)
 const LETTER_SCORES = Object.assign(
   {},
@@ -25,7 +20,8 @@ const LETTER_SCORES = Object.assign(
 // Basic tile distribution (small, tweak as needed)
 const DEFAULT_DISTRIBUTION = {
   A:9, B:2, C:2, D:4, E:12, F:2, G:3, H:2, I:9, J:1, K:1, L:4,
-  M:2, N:6, O:8, P:2, Q:1, R:6, S:4, T:6, U:4, V:2, W:2, X:1, Y:2, Z:1
+  M:2, N:6, O:8, P:2, Q:1, R:6, S:4, T:6, U:4, V:2, W:2, X:1, Y:2, Z:1,
+  "*":2  // wild tiles
 };
 
 export function createBoard(rows = DEFAULT_ROWS, cols = DEFAULT_COLS) {
@@ -61,7 +57,7 @@ export function placeTile(board, col, tile, bag) {
   for (let r = rows - 1; r >= 0; r--) {
     if (!board[r][col]) {
       const newBoard = board.map(row => row.slice());
-      newBoard[r][col] = tile;
+      newBoard[r][col] = (typeof tile === "string") ? tile.toUpperCase() : tile;
       return { board: newBoard, placedRow: r, nextBag: bag, gameOver: false };
     }
   }
@@ -88,7 +84,7 @@ export function applyGravity(board) {
 
 // Find all words on the board (4 directions): right, down, down-right, up-right
 // Returns { words: [{ positions: [[r,c],...], text }], boardPositionsMarked: Set-of-positions }
-export function findAllWords(board, dict = SAMPLE_DICT, minLen = MIN_WORD_LEN) {
+export function findAllWords(board, dict, minLen = MIN_WORD_LEN) {
   const rows = board.length, cols = board[0].length;
   const found = [];
   const marked = new Set();
@@ -102,33 +98,96 @@ export function findAllWords(board, dict = SAMPLE_DICT, minLen = MIN_WORD_LEN) {
 
   function inBounds(r,c){ return r>=0 && r<rows && c>=0 && c<cols; }
 
+  // Helper: generate all strings by replacing '*' with letters (recursive)
+  function* generateCandidates(pattern) {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const firstStar = pattern.indexOf("*");
+    if (firstStar === -1) {
+      yield pattern;
+      return;
+    }
+    for (let i = 0; i < letters.length; i++) {
+      const next = pattern.slice(0, firstStar) + letters[i] + pattern.slice(firstStar + 1);
+      yield* generateCandidates(next);
+    }
+  }
+
+  // Check if word matches dictionary, treating * as wildcard
+  function matchesDict(word) {
+    if (!word.includes("*")) return dict.has(word) ? word : null;
+    const starCount = (word.match(/\*/g) || []).length;
+    if (starCount >= 4) return null;
+    for (const candidate of generateCandidates(word)) {
+      if (dict.has(candidate)) return candidate;
+    }
+    return null;
+  }
+
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (!board[r][c]) continue;
       for (const d of dirs) {
-        // To avoid duplicate detection, ensure previous cell in opposite direction is empty/out-of-bounds
-        const prevR = r - d.dr, prevC = c - d.dc;
-        if (inBounds(prevR, prevC) && board[prevR][prevC]) continue;
-
-        let rr = r, cc = c, letters = "", positions = [];
+        let rr = r, cc = c;
+        let letters = "", positions = [];
         while (inBounds(rr, cc) && board[rr][cc]) {
-          letters += board[rr][cc];
-          positions.push([rr,cc]);
+          const raw = board[rr][cc];
+          const letter = (typeof raw === "string") ? raw.toUpperCase() : raw;
+          letters += letter;
+          positions.push([rr, cc]);
+
+          if (letters.length === 4) {
+            console.log(`Checking 4-letter word: "${letters}" at [${r},${c}] dir [${d.dr},${d.dc}]`);
+          }
+
           if (letters.length >= minLen) {
-            // Check if this substring is a word
-            if (dict.has(letters)) {
-              // record word positions
-              found.push({ text: letters, positions: positions.slice() });
-              positions.forEach(p => marked.add(`${p[0]}:${p[1]}`));
+            const matchedWord = matchesDict(letters);
+            if (matchedWord) {
+              console.log(`Found word "${matchedWord}" at positions:`, positions);
+              const posKey = positions.map(p => `${p[0]}:${p[1]}`).join(",");
+              const isDuplicate = found.some(f => 
+                f.positions.map(p => `${p[0]}:${p[1]}`).join(",") === posKey
+              );
+              if (!isDuplicate) {
+                found.push({ text: matchedWord, positions: positions.slice() });
+                positions.forEach(p => marked.add(`${p[0]}:${p[1]}`));
+              }
             }
           }
-          rr += d.dr; cc += d.dc;
+
+          rr += d.dr;
+          cc += d.dc;
         }
       }
     }
   }
 
   return { words: found, markedPositions: marked }; 
+}
+
+// Remove marked positions and return new board + score of removal
+export function removeMarkedWithWords(board, words, scoring = LETTER_SCORES) {
+  const rows = board.length, cols = board[0].length;
+  const newBoard = board.map(row => row.slice());
+  const posToLetter = new Map();
+  
+  for (const w of words) {
+    const { text, positions } = w;
+    for (let i = 0; i < positions.length; i++) {
+      const [r, c] = positions[i];
+      const key = `${r}:${c}`;
+      const boardLetter = newBoard[r] && newBoard[r][c];
+      const resolved = (boardLetter && boardLetter !== "*") ? boardLetter : text[i];
+      posToLetter.set(key, resolved);
+      newBoard[r][c] = null;
+    }
+  }
+
+  let score = 0;
+  for (const [pos, letter] of posToLetter.entries()) {
+    score += (scoring[letter] || 1);
+  }
+
+  const gravityBoard = applyGravity(newBoard);
+  return { board: gravityBoard, score };
 }
 
 // Remove marked positions and return new board + score of removal
