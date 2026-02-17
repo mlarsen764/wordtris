@@ -95,45 +95,58 @@ export default function App() {
     }
     let newBoard = res.board;
 
+    // Animate the newly placed tile
+    const placeAnims = createBoard(ROWS, COLS);
+    placeAnims[res.placedRow][col] = 'placing';
+    setBoard(newBoard);
+    setAnimStates(placeAnims);
+
+    // Clear placing animation after it completes
+    setTimeout(() => {
+      setAnimStates(createBoard(ROWS, COLS));
+    }, 250);
+
     // find words using the loaded dictionary
     console.log("Board state:", newBoard);
     const found = findAllWords(newBoard, wordSet, MIN_WORD_LEN);
     console.log("Found words:", found.words.map(w => w.text));
 
     if (found.markedPositions && found.markedPositions.size > 0) {
-      // Mark cells for removal animation
-      const removeAnims = createBoard(ROWS, COLS);
-      found.markedPositions.forEach(pos => {
-        const [r, c] = pos.split(':').map(Number);
-        removeAnims[r][c] = 'removing';
-      });
-      setAnimStates(removeAnims);
-
-      // Wait for fade-out animation, then remove and apply gravity
+      // Wait for placing animation to finish before starting removal
       setTimeout(() => {
-        const { board: after, score: delta } = removeMarkedWithWords(newBoard, found.words);
-        
-        // Mark cells that moved for falling animation
-        const fallAnims = createBoard(ROWS, COLS);
-        for (let c = 0; c < COLS; c++) {
-          for (let r = ROWS - 1; r >= 0; r--) {
-            if (after[r][c] && newBoard[r][c] !== after[r][c]) {
-              fallAnims[r][c] = 'falling';
+        // Mark cells for removal animation
+        const removeAnims = createBoard(ROWS, COLS);
+        found.markedPositions.forEach(pos => {
+          const [r, c] = pos.split(':').map(Number);
+          removeAnims[r][c] = 'removing';
+        });
+        setAnimStates(removeAnims);
+
+        // Wait for fade-out animation, then remove and apply gravity
+        setTimeout(() => {
+          const { board: after, score: delta } = removeMarkedWithWords(newBoard, found.words);
+          
+          // Mark cells that moved for falling animation
+          const fallAnims = createBoard(ROWS, COLS);
+          for (let c = 0; c < COLS; c++) {
+            for (let r = ROWS - 1; r >= 0; r--) {
+              if (after[r][c] && newBoard[r][c] !== after[r][c]) {
+                fallAnims[r][c] = 'falling';
+              }
             }
           }
-        }
-        
-        setBoard(after);
-        setAnimStates(fallAnims);
-        setScore(s => s + delta);
-        setFoundWords(prev => [...found.words.map(w => w.text), ...prev].slice(0, 100));
-        setMessage(`Cleared ${found.markedPositions.size} letters from ${found.words.length} words`);
-        
-        // Clear animations after they complete
-        setTimeout(() => setAnimStates(createBoard(ROWS, COLS)), 300);
-      }, 300);
+          
+          setBoard(after);
+          setAnimStates(fallAnims);
+          setScore(s => s + delta);
+          setFoundWords(prev => [...found.words.map(w => w.text), ...prev].slice(0, 100));
+          setMessage(`Cleared ${found.markedPositions.size} letters from ${found.words.length} words`);
+          
+          // Clear animations after they complete
+          setTimeout(() => setAnimStates(createBoard(ROWS, COLS)), 300);
+        }, 300);
+      }, 250);
     } else {
-      setBoard(newBoard);
       setMessage("");
     }
 
