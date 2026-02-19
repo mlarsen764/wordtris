@@ -66,8 +66,17 @@ export default function App() {
     const newBag = bag.slice();
     let newCurrent = next;
     if (!newCurrent) newCurrent = drawTile(newBag);
-    const newNext = drawTile(newBag);
-    setBag(newBag);
+    let newNext = drawTile(newBag);
+    
+    // Restock bag if empty
+    if (!newNext && newBag.length === 0) {
+      const restockedBag = makeTileBag();
+      newNext = drawTile(restockedBag);
+      setBag(restockedBag);
+    } else {
+      setBag(newBag);
+    }
+    
     setCurrent(newCurrent);
     setNext(newNext);
   }
