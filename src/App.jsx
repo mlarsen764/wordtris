@@ -6,11 +6,21 @@ import {
 import { loadWordSet } from "./Dictionary";
 import "./index.css";
 
-const ROWS = 8, COLS = 5;
-const MIN_WORD_LEN = 4; // change here if you want 3+
+const ROWS = 8, COLS = 6;
+const MIN_WORD_LEN = 4;
 
-function Cell({ val, animState }) {
-  return <div className={"cell " + (val ? "filled " : "") + (animState || "")}>{val || ""}</div>;
+const LETTER_SCORES = Object.assign(
+  {},
+  ..."AEIOULNSTR".split("").map(l => ({[l]:1})),
+  ..."DG".split("").map(l => ({[l]:2})),
+  ..."BCMP".split("").map(l => ({[l]:3})),
+  ..."FHVWY".split("").map(l => ({[l]:4})),
+  {"K":5, "J":8, "X":8, "Q":10, "Z":10}
+);
+
+function Cell({ val, animState, selected }) {
+  const className = "cell " + (val ? "filled " : "") + (animState ? animState + " " : "") + (selected ? "selected" : "");
+  return <div className={className}>{val || ""}</div>;
 }
 
 export default function App() {
@@ -24,6 +34,7 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [animStates, setAnimStates] = useState(() => createBoard(ROWS, COLS));
   const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedCells, setSelectedCells] = useState([]);
 
   const [wordSet, setWordSet] = useState(null);
   const [loadingDict, setLoadingDict] = useState(true);
@@ -102,65 +113,187 @@ export default function App() {
     return { localBag, newCurrent, newNext };
   }
 
-  function handleColumnClick(col) {
-    console.log('Click - isAnimating:', isAnimating, 'gameOver:', gameOver, 'current:', current);
-    if (gameOver) return;
-    if (loadingDict) {
-      setMessage("Please wait — dictionary still loading.");
-      return;
-    }
-    if (dictError) {
-      setMessage("Dictionary failed to load. See console.");
-      return;
-    }
-    if (!current) {
-      setMessage("No tile to place");
-      console.log('No current tile!');
-      return;
-    }
+  function isAdjacent(r1, c1, r2, c2) {
+    return Math.abs(r1 - r2) <= 1 && Math.abs(c1 - c2) <= 1 && !(r1 === r2 && c1 === c2);
+  }
 
-    const res = placeTile(board, col, current, bag);
-    if (res.gameOver) {
-      setGameOver(true);
-      setMessage("Game Over — column full!");
-      return;
-    }
-    let newBoard = res.board;
+  function getDirection(r1, c1, r2, c2) {
+    const dr = r2 - r1;
+    const dc = c2 - c1;
+    // Normalize to -1, 0, or 1
+    return { dr: Math.sign(dr), dc: Math.sign(dc) };
+  }
 
-    // Animate the newly placed tile
-    const placeAnims = createBoard(ROWS, COLS);
-    placeAnims[res.placedRow][col] = 'placing';
-    setBoard(newBoard);
-    setAnimStates(placeAnims);
-
-    // draw next tile synchronously from a local bag (avoid stale closures)
-    const { localBag: afterBag, newCurrent, newNext } = drawFromBag(bag.slice(), next);
-    setBag(afterBag);
-    setCurrent(newCurrent);
-    setNext(newNext);
+  function isInLine(cells) {
+    if (cells.length < 2) return true;
     
-    console.log('After draw - current:', newCurrent, 'next:', newNext, 'bag size:', afterBag.length);
-
-    // Clear placing animation after it completes
-    setTimeout(() => {
-      if (!mountedRef.current) return;
-      setAnimStates(createBoard(ROWS, COLS));
-    }, 250);
-
-    // find words using the loaded dictionary (guarded)
-    const found = wordSet ? findAllWords(newBoard, wordSet, MIN_WORD_LEN) : { words: [], markedPositions: new Set() };
-
-    // If words found, remove them immediately
-    if (found.markedPositions && found.markedPositions.size > 0) {
-      const { board: after, score: delta } = removeMarkedWithWords(newBoard, found.words);
-      
-      setBoard(after);
-      setScore(s => s + delta);
-      setFoundWords(prev => [...found.words.map(w => w.text), ...prev].slice(0, 100));
-      setMessage(`Cleared ${found.markedPositions.size} letters from ${found.words.length} words`);
-    } else {
-      setMessage("");
+    const dir = getDirection(cells[0].row, cells[0].col, cells[1].row, cells[1].col);
+    
+    for (let i = 1; i < cells.length - 1; i++) {
+      const nextDir = getDirection(cells[i].row, cells[i].col, cells[i + 1].row, cells[i + 1].col);
+      if (nextDir.dr !== dir.dr || nextDir.dc !== dir.dc) {
+        return false;
+      }
     }
+    return true;
+  }
+
+  function handleCellClick(row, col) {
+    if (gameOver) return;
+    
+    // If cell is empty, place a tile in that column
+    if (!board[row][col]) {
+      if (loadingDict) {
+        setMessage("Please wait — dictionary still loading.");
+        return;
+      }
+      if (dictError) {
+        setMessage("Dictionary failed to load. See console.");
+        return;
+      }
+      if (!current) {
+        setMessage("No tile to place");
+        return;
+      }
+
+      const res = placeTile(board, col, current, bag);
+      if (res.gameOver) {
+        setGameOver(true);
+        setMessage("Game Over — column full!");
+        return;
+      }
+      let newBoard = res.board;
+
+      const placeAnims = createBoard(ROWS, COLS);
+      placeAnims[res.placedRow][col] = 'placing';
+      setBoard(newBoard);
+      setAnimStates(placeAnims);
+
+      const { localBag: afterBag, newCurrent, newNext } = drawFromBag(bag.slice(), next);
+      setBag(afterBag);
+      setCurrent(newCurrent);
+      setNext(newNext);
+
+      setSafeTimeout(() => {
+        setAnimStates(createBoard(ROWS, COLS));
+      }, 250);
+
+      setMessage("");
+      return;
+    }
+    
+    // Cell has a letter - select it for word building
+    const cellKey = `${row},${col}`;
+    const idx = selectedCells.findIndex(c => c.key === cellKey);
+    
+    if (idx !== -1) {
+      // Deselect if clicking last selected cell
+      if (idx === selectedCells.length - 1) {
+        setSelectedCells(prev => prev.slice(0, -1));
+      }
+      return;
+    }
+    
+    // Check adjacency if not first cell
+    if (selectedCells.length > 0) {
+      const last = selectedCells[selectedCells.length - 1];
+      if (!isAdjacent(last.row, last.col, row, col)) {
+        setMessage("Letters must be adjacent!");
+        return;
+      }
+    }
+    
+    const newSelection = [...selectedCells, { row, col, key: cellKey, letter: board[row][col] }];
+    
+    // Check if still in a straight line
+    if (!isInLine(newSelection)) {
+      setMessage("Letters must form a straight line!");
+      return;
+    }
+    
+    setSelectedCells(prev => newSelection);
+    setMessage("");
+  }
+
+  function matchesDict(word, dict) {
+    if (!word.includes("*")) return dict.has(word) ? word : null;
+    
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    function* generateCandidates(pattern) {
+      const firstStar = pattern.indexOf("*");
+      if (firstStar === -1) {
+        yield pattern;
+        return;
+      }
+      for (let i = 0; i < letters.length; i++) {
+        const next = pattern.slice(0, firstStar) + letters[i] + pattern.slice(firstStar + 1);
+        yield* generateCandidates(next);
+      }
+    }
+    
+    const starCount = (word.match(/\*/g) || []).length;
+    if (starCount >= 4) return null;
+    
+    for (const candidate of generateCandidates(word)) {
+      if (dict.has(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  function handleSubmitWord() {
+    if (selectedCells.length < MIN_WORD_LEN) {
+      setMessage(`Word must be at least ${MIN_WORD_LEN} letters!`);
+      return;
+    }
+    
+    const word = selectedCells.map(c => c.letter).join("");
+    const matchedWord = matchesDict(word, wordSet);
+    
+    if (!wordSet || !matchedWord) {
+      setMessage(`"${word}" is not a valid word!`);
+      setSelectedCells([]);
+      return;
+    }
+    
+    // Remove the selected letters
+    const newBoard = board.map(row => [...row]);
+    selectedCells.forEach(({ row, col }) => {
+      newBoard[row][col] = null;
+    });
+    
+    // Apply gravity
+    for (let c = 0; c < COLS; c++) {
+      const column = [];
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (newBoard[r][c]) column.push(newBoard[r][c]);
+      }
+      for (let r = ROWS - 1; r >= 0; r--) {
+        newBoard[r][c] = column[ROWS - 1 - r] || null;
+      }
+    }
+    
+    // Calculate score using letter values
+    let baseScore = 0;
+    for (let i = 0; i < selectedCells.length; i++) {
+      const letter = selectedCells[i].letter;
+      const resolvedLetter = (letter !== "*") ? letter : matchedWord[i];
+      baseScore += (LETTER_SCORES[resolvedLetter] || 1);
+    }
+    
+    // Apply length bonus: 2x for 5 letters, 3x for 6, 4x for 7, etc.
+    const lengthBonus = selectedCells.length >= 5 ? selectedCells.length - 3 : 1;
+    const score = baseScore * lengthBonus;
+    
+    setBoard(newBoard);
+    setScore(s => s + score);
+    setFoundWords(prev => [matchedWord, ...prev].slice(0, 100));
+    setMessage(`Found "${matchedWord}"! +${score} points${lengthBonus > 1 ? ` (${lengthBonus}x bonus)` : ''}`);
+    setSelectedCells([]);
+  }
+
+  function handleClearSelection() {
+    setSelectedCells([]);
+    setMessage("");
   }
 
   function handleReset() {
@@ -178,35 +311,48 @@ export default function App() {
     setFoundWords([]);
     setGameOver(false);
     setMessage("");
+    setSelectedCells([]);
   }
 
   return (
     <div className="app">
       <div className="game-area">
-      <h1>WordDrop</h1>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
+        <h1 style={{margin: 0}}>WordDrop</h1>
+        <button onClick={handleReset}>New Game</button>
+      </div>
 
       <div className="topbar">
         <div>Score: {score}</div>
-        <div className="tile-preview">Current: <div className="preview">{current}</div></div>
-        <div className="tile-preview">Next: <div className="preview small">{next}</div></div>
-        <button onClick={handleReset}>Reset</button>
+        <div className="tile-preview">Current: <div className="cell filled" style={{background: 'linear-gradient(180deg, #375, #1a4)', width: 40}}>{current}</div></div>
+        <div className="tile-preview">Upcoming: <div className="cell filled" style={{background: 'linear-gradient(180deg, #fbbf24, #f59e0b)', width: 40}}>{next}</div></div>
       </div>
 
       {loadingDict && <div style={{color:"#ffea", marginBottom:8}}>Loading dictionary...</div>}
       {dictError && <div style={{color:"#f88", marginBottom:8}}>Dictionary error: {dictError}</div>}
 
+      <div className="word-controls">
+        <div>Selected: <strong>{selectedCells.map(c => c.letter).join("")}</strong></div>
+        <button onClick={handleSubmitWord} disabled={selectedCells.length < MIN_WORD_LEN}>Submit Word</button>
+        <button onClick={handleClearSelection} disabled={selectedCells.length === 0}>Clear</button>
+      </div>
+
       <div className={"board" + (isAnimating ? " animating" : "")} style={{ gridTemplateRows: `repeat(${ROWS}, 48px)`, gridTemplateColumns: `repeat(${COLS}, 48px)` }}>
         {board.map((row, rIdx) =>
-          row.map((cell, cIdx) => (
-            <div key={`${rIdx}:${cIdx}`} className="board-cell" onClick={() => handleColumnClick(cIdx)}>
-              <Cell val={cell} animState={animStates[rIdx][cIdx]} />
-            </div>
-          ))
+          row.map((cell, cIdx) => {
+            const cellKey = `${rIdx},${cIdx}`;
+            const isSelected = selectedCells.some(c => c.key === cellKey);
+            return (
+              <div key={cellKey} className="board-cell" onClick={() => handleCellClick(rIdx, cIdx)}>
+                <Cell val={cell} animState={animStates[rIdx][cIdx]} selected={isSelected} />
+              </div>
+            );
+          })
         )}
       </div>
 
       <div className="help">
-        <p>Click a column to place the current tile. Words {MIN_WORD_LEN}+ letters (horiz, vert, diagonals) are removed automatically.</p>
+        <p>Tap empty cells to place tiles. Tap filled cells to select letters for a word (must be adjacent).</p>
         <p>{message}</p>
         <p style={{fontSize:12, color:"#aaa"}}>
           Dictionary: {loadingDict ? "loading…" : (wordSet ? `${wordSet.size} words loaded` : "none")}
