@@ -24,6 +24,32 @@ const DEFAULT_DISTRIBUTION = {
   "*":2  // wild tiles
 };
 
+export class Bag {
+  constructor(dist = DEFAULT_DISTRIBUTION) {
+    this.dist = dist;
+    this.refillCount = 0;
+    this._refill();
+  }
+  
+  _refill() {
+    this.items = makeTileBag(this.dist);
+    this.refillCount++;
+  }
+  
+  draw() {
+    let t = drawTile(this.items);
+    if (t === null) {
+      this._refill();
+      t = drawTile(this.items);
+    }
+    return t;
+  }
+  
+  remaining() {
+    return this.items.length;
+  }
+}
+
 export function createBoard(rows = DEFAULT_ROWS, cols = DEFAULT_COLS) {
   return Array.from({length: rows}, () => Array(cols).fill(null));
 }
