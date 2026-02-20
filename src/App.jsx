@@ -324,8 +324,8 @@ export default function App() {
 
       <div className="topbar">
         <div>Score: {score}</div>
-        <div className="tile-preview">Current: <div className="cell filled" style={{background: 'linear-gradient(180deg, #375, #1a4)', width: 40}}>{current}</div></div>
-        <div className="tile-preview">Upcoming: <div className="cell filled" style={{background: 'linear-gradient(180deg, #fbbf24, #f59e0b)', width: 40}}>{next}</div></div>
+        <div className="tile-preview">Current: <div className="cell filled" style={{background: 'linear-gradient(180deg, #375, #1a4)'}}>{current}</div></div>
+        <div className="tile-preview">Upcoming: <div className="cell filled" style={{background: 'linear-gradient(180deg, #fbbf24, #f59e0b)'}}>{next}</div></div>
       </div>
 
       {loadingDict && <div style={{color:"#ffea", marginBottom:8}}>Loading dictionary...</div>}
@@ -337,7 +337,7 @@ export default function App() {
         <button onClick={handleClearSelection} disabled={selectedCells.length === 0}>Clear</button>
       </div>
 
-      <div className={"board" + (isAnimating ? " animating" : "")} style={{ gridTemplateRows: `repeat(${ROWS}, 48px)`, gridTemplateColumns: `repeat(${COLS}, 48px)` }}>
+      <div className={"board" + (isAnimating ? " animating" : "")} style={{ gridTemplateRows: `repeat(${ROWS}, var(--cell-size))`, gridTemplateColumns: `repeat(${COLS}, var(--cell-size))` }}>
         {board.map((row, rIdx) =>
           row.map((cell, cIdx) => {
             const cellKey = `${rIdx},${cIdx}`;

@@ -1,3 +1,7 @@
+:root {
+  --cell-size: 56px;
+}
+
 body {
   font-family: system-ui, Arial;
   background: #111;
@@ -103,17 +107,15 @@ body {
   border-radius: 8px;
 }
 .board-cell {
-  width: 48px;
-  height: 48px;
-  padding: 3px;
+  width: var(--cell-size);
+  height: var(--cell-size);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
 }
 .cell {
-  width: 48px;
-  height: 48px;
+  width: var(--cell-size);
+  height: var(--cell-size);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -122,6 +124,7 @@ body {
   border: 1px solid #333;
   color: #fff;
   font-weight: 700;
+  font-size: 14px;
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 .cell.filled {
@@ -218,6 +221,9 @@ button:disabled {
 }
 
 @media (max-width: 768px) {
+  :root {
+    --cell-size: 56px;
+  }
   body {
     padding: 12px;
   }
@@ -234,14 +240,7 @@ button:disabled {
     padding: 4px;
   }
   .board-cell {
-    width: 40px;
-    height: 40px;
     padding: 2px;
-  }
-  .cell {
-    width: 40px;
-    height: 40px;
-    font-size: 18px;
   }
   .words-list {
     width: 100%;
