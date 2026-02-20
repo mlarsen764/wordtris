@@ -35,6 +35,7 @@ export default function App() {
   const [animStates, setAnimStates] = useState(() => createBoard(ROWS, COLS));
   const [isAnimating, setIsAnimating] = useState(false);
   const [selectedCells, setSelectedCells] = useState([]);
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   const [wordSet, setWordSet] = useState(null);
   const [loadingDict, setLoadingDict] = useState(true);
@@ -94,6 +95,20 @@ export default function App() {
     })();
     return () => { mounted = false; };
   }, []);
+
+  // Timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedTime(t => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   function drawFromBag(localBag, promotedNext) {
     const refill = () => makeTileBag();
@@ -312,6 +327,7 @@ export default function App() {
     setGameOver(false);
     setMessage("");
     setSelectedCells([]);
+    setElapsedTime(0);
   }
 
   return (
@@ -319,13 +335,14 @@ export default function App() {
       <div className="game-area">
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
         <h1 style={{margin: 0}}>WordDrop</h1>
+        <div style={{fontSize: 18, color: '#aaa'}}>{formatTime(elapsedTime)}</div>
         <button onClick={handleReset}>New Game</button>
       </div>
 
       <div className="topbar">
         <div>Score: {score}</div>
         <div className="tile-preview">Current: <div className="cell filled" style={{background: 'linear-gradient(180deg, #375, #1a4)'}}>{current}</div></div>
-        <div className="tile-preview">Upcoming: <div className="cell filled" style={{background: 'linear-gradient(180deg, #fbbf24, #f59e0b)'}}>{next}</div></div>
+        <div className="tile-preview upcoming">Upcoming: <div className="cell filled" style={{background: 'linear-gradient(180deg, #fbbf24, #f59e0b)'}}>{next}</div></div>
       </div>
 
       {loadingDict && <div style={{color:"#ffea", marginBottom:8}}>Loading dictionary...</div>}
