@@ -236,15 +236,17 @@ button:disabled {
     --cell-size: 56px;
   }
   body {
-    padding: 12px;
+    padding: 8px;
+    overflow-x: hidden;
   }
   .app {
     flex-direction: column;
     gap: 16px;
+    width: 100%;
   }
   .game-area {
     width: 100%;
-    max-width: 340px;
+    max-width: 100%;
     margin: 0 auto;
   }
   .board {
@@ -255,7 +257,7 @@ button:disabled {
   }
   .words-list {
     width: 100%;
-    max-width: 340px;
+    max-width: 100%;
     margin: 0 auto;
     max-height: 300px;
   }
