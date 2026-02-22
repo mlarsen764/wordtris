@@ -8,7 +8,7 @@ const DEFAULT_COLS = 5;
 const MIN_WORD_LEN = 4;
 
 // Simple letter scores (Scrabble-like small subset)
-const LETTER_SCORES = Object.assign(
+export const LETTER_SCORES = Object.assign(
   {},
   ..."AEIOULNSTR".split("").map(l => ({[l]:1})),
   ..."DG".split("").map(l => ({[l]:2})),

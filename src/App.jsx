@@ -1,22 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   createBoard, makeTileBag, drawTile, placeTile,
-  findAllWords, removeMarkedWithWords
+  findAllWords, removeMarkedWithWords, LETTER_SCORES
 } from "./GameEngine";
 import { loadWordSet } from "./Dictionary";
 import "./index.css";
 
 const ROWS = 8, COLS = 6;
-const MIN_WORD_LEN = 4;
-
-const LETTER_SCORES = Object.assign(
-  {},
-  ..."AEIOULNSTR".split("").map(l => ({[l]:1})),
-  ..."DG".split("").map(l => ({[l]:2})),
-  ..."BCMP".split("").map(l => ({[l]:3})),
-  ..."FHVWY".split("").map(l => ({[l]:4})),
-  {"K":5, "J":8, "X":8, "Q":10, "Z":10}
-);
+const MIN_WORD_LEN = 3;
 
 function Cell({ val, animState, selected }) {
   const className = "cell " + (val ? "filled " : "") + (animState ? animState + " " : "") + (selected ? "selected" : "");
@@ -295,14 +286,14 @@ export default function App() {
       baseScore += (LETTER_SCORES[resolvedLetter] || 1);
     }
     
-    // Apply length bonus: 2x for 5 letters, 3x for 6, 4x for 7, etc.
-    const lengthBonus = selectedCells.length >= 5 ? selectedCells.length - 3 : 1;
+    // Apply length bonus: 1x for 3 letters, 2x for 4, 3x for 5, 4x for 6, etc.
+    const lengthBonus = selectedCells.length - 2;
     const score = baseScore * lengthBonus;
     
     setBoard(newBoard);
     setScore(s => s + score);
     setFoundWords(prev => [matchedWord, ...prev].slice(0, 100));
-    setMessage(`Found "${matchedWord}"! +${score} points${lengthBonus > 1 ? ` (${lengthBonus}x bonus)` : ''}`);
+    setMessage(`Found "${matchedWord}"! +${score} points${lengthBonus > 1 ? ` (${lengthBonus}x)` : ''}`);
     setSelectedCells([]);
   }
 
