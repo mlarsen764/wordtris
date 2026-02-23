@@ -360,10 +360,10 @@ export default function App() {
       </div>
 
       <div className="help">
-        <p>Tap empty cells to place tiles. Tap filled cells to select letters for a word (must be adjacent).</p>
+        <p>Tap empty cells to place tiles. Tap filled cells to select letters for a word (must form a line, at least 3 letters long).</p>
         <p>{message}</p>
         <p style={{fontSize:12, color:"#aaa"}}>
-          Dictionary: {loadingDict ? "loading…" : (wordSet ? `${wordSet.size} words loaded` : "none")}
+          <a href="https://docs.google.com/document/d/10l4neklmU3p75YLZ1Ejfed_--un6gW-Fxy_T5XtrqE4/edit?usp=sharing" target="_blank" rel="noopener noreferrer" style={{color: '#4a9eff', textDecoration: 'none'}}>Word Game Ideas - Share Feedback</a>
         </p>
       </div>
       </div>
