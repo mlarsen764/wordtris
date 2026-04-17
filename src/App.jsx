@@ -4,6 +4,8 @@ import {
   findAllWords, removeMarkedWithWords, LETTER_SCORES
 } from "./GameEngine";
 import { loadWordSet } from "./Dictionary";
+import { supabase } from "./supabase";
+import Leaderboard from "./Leaderboard";
 import "./index.css";
 
 const ROWS = 8, COLS = 6;
@@ -15,6 +17,7 @@ function Cell({ val, animState, selected }) {
 }
 
 export default function App() {
+  const [screen, setScreen] = useState('menu'); // 'menu' | 'game' | 'leaderboard'
   const [board, setBoard] = useState(() => createBoard(ROWS, COLS));
   const [bag, setBag] = useState(() => makeTileBag());
   const [current, setCurrent] = useState(null);
@@ -31,6 +34,9 @@ export default function App() {
   const [wordSet, setWordSet] = useState(null);
   const [loadingDict, setLoadingDict] = useState(true);
   const [dictError, setDictError] = useState(null);
+  const [showScoreModal, setShowScoreModal] = useState(false);
+  const [username, setUsername] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const mountedRef = useRef(true);
   const timeoutsRef = useRef([]);
@@ -165,6 +171,7 @@ export default function App() {
       const res = placeTile(board, col, current, bag);
       if (res.gameOver) {
         setGameOver(true);
+        setShowScoreModal(true);
         setMessage("Game Over — column full!");
         return;
       }
@@ -302,7 +309,16 @@ export default function App() {
     setMessage("");
   }
 
-  function handleReset() {
+  async function handleScoreSubmit() {
+    if (!username.trim()) return;
+    setSubmitting(true);
+    await supabase.from('high_scores').insert({ username: username.trim(), score });
+    setSubmitting(false);
+    setShowScoreModal(false);
+    setScreen('menu');
+  }
+
+  function startNewGame() {
     timeoutsRef.current.forEach(clearTimeout);
     timeoutsRef.current = [];
     setBoard(createBoard(ROWS, COLS));
@@ -319,15 +335,59 @@ export default function App() {
     setMessage("");
     setSelectedCells([]);
     setElapsedTime(0);
+    setShowScoreModal(false);
+    setUsername("");
+    setScreen('game');
+  }
+
+  function handleEndGame() {
+    setGameOver(true);
+    setShowScoreModal(true);
+  }
+
+  if (screen === 'menu') {
+    return (
+      <div className="menu">
+        <h1>WordDrop</h1>
+        <button onClick={startNewGame}>New Game</button>
+        <button onClick={() => setScreen('leaderboard')}>Leaderboard</button>
+      </div>
+    );
+  }
+
+  if (screen === 'leaderboard') {
+    return <Leaderboard onBack={() => setScreen('menu')} />;
   }
 
   return (
     <div className="app">
+      {showScoreModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100}}>
+          <div style={{background:'#222',padding:24,borderRadius:8,minWidth:280,textAlign:'center'}}>
+            <h2 style={{marginTop:0}}>Game Over!</h2>
+            <p>Your score: <strong>{score}</strong></p>
+            <input
+              placeholder="Enter username"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleScoreSubmit()}
+              style={{padding:'6px 10px',borderRadius:4,border:'1px solid #555',background:'#333',color:'#fff',width:'100%',boxSizing:'border-box',marginBottom:12}}
+              autoFocus
+            />
+            <div style={{display:'flex',gap:8,justifyContent:'center'}}>
+              <button onClick={handleScoreSubmit} disabled={submitting || !username.trim()}>
+                {submitting ? 'Submitting...' : 'Submit Score'}
+              </button>
+              <button onClick={() => { setShowScoreModal(false); setScreen('menu'); }}>Skip</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="game-area">
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
         <h1 style={{margin: 0}}>WordDrop</h1>
         <div style={{fontSize: 18, color: '#aaa'}}>{formatTime(elapsedTime)}</div>
-        <button onClick={handleReset}>New Game</button>
+        <button onClick={handleEndGame}>End Game</button>
       </div>
 
       <div className="topbar">

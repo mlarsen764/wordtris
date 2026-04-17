@@ -14,6 +14,41 @@ body {
   display: flex;
   gap: 24px;
 }
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding-top: 80px;
+}
+.menu h1 {
+  font-size: 48px;
+  margin: 0 0 16px 0;
+}
+.menu button {
+  width: 200px;
+  padding: 14px;
+  font-size: 16px;
+}
+.leaderboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px 0;
+  width: 300px;
+}
+.leaderboard-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  font-size: 15px;
+}
+.lb-rank { color: #888; width: 28px; }
+.lb-name { flex: 1; }
+.lb-score { color: #f93; font-weight: 700; }
 .game-area {
   width: 420px;
   position: relative;
@@ -87,6 +122,7 @@ body {
   border: 2px solid #333;
   border-radius: 6px;
   padding: 6px 10px;
+  opacity: 0.5;
 }
 .tile-preview.upcoming .cell {
   width: 40px;
